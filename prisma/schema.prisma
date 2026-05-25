@@ -1,0 +1,131 @@
+﻿generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum PrStatus {
+  OPEN
+  CHANGES_REQUESTED
+  APPROVED
+  MERGED
+}
+
+model User {
+  id            String           @id @default(cuid())
+  email         String           @unique
+  name          String?
+  xp            Int              @default(0)
+  level         Int              @default(1)
+  streakDays    Int              @default(0)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  missionRuns   MissionRun[]
+  achievements  UserAchievement[]
+  sessions      SimulationSession[]
+}
+
+model Mission {
+  id            String           @id @default(cuid())
+  title         String
+  slug          String           @unique
+  storyIntro    String
+  objective     String
+  difficulty    Difficulty
+  orderIndex    Int
+  steps         MissionStep[]
+  createdAt     DateTime         @default(now())
+}
+
+model MissionStep {
+  id            String           @id @default(cuid())
+  missionId      String
+  index          Int
+  expectedCmd    String
+  hint           String
+  mission        Mission          @relation(fields: [missionId], references: [id], onDelete: Cascade)
+}
+
+model MissionRun {
+  id            String           @id @default(cuid())
+  userId         String
+  missionId      String
+  status         String
+  progress       Float            @default(0)
+  startedAt      DateTime         @default(now())
+  completedAt    DateTime?
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission        Mission          @relation(fields: [missionId], references: [id], onDelete: Cascade)
+}
+
+model SimulationSession {
+  id            String           @id @default(cuid())
+  userId         String
+  missionId      String
+  headBranch     String           @default("main")
+  repoStateJson  Json
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events         SimulationEvent[]
+  prs            PullRequest[]
+}
+
+model SimulationEvent {
+  id            String           @id @default(cuid())
+  sessionId      String
+  command        String
+  output         String
+  xpDelta        Int              @default(0)
+  createdAt      DateTime         @default(now())
+  session        SimulationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model PullRequest {
+  id            String           @id @default(cuid())
+  sessionId      String
+  title          String
+  sourceBranch   String
+  targetBranch   String
+  status         PrStatus         @default(OPEN)
+  createdAt      DateTime         @default(now())
+  session        SimulationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  comments       PrComment[]
+}
+
+model PrComment {
+  id            String           @id @default(cuid())
+  prId           String
+  author         String
+  body           String
+  createdAt      DateTime         @default(now())
+  pr             PullRequest      @relation(fields: [prId], references: [id], onDelete: Cascade)
+}
+
+model Achievement {
+  id            String           @id @default(cuid())
+  code          String           @unique
+  name          String
+  description   String
+  users         UserAchievement[]
+}
+
+model UserAchievement {
+  id             String          @id @default(cuid())
+  userId         String
+  achievementId  String
+  awardedAt      DateTime        @default(now())
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement    Achievement     @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+}
